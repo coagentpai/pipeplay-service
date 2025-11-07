@@ -1,0 +1,9 @@
+homeassistant>=2023.11.0
+pulsectl>=22.3.2
+asyncio-mqtt>=0.13.0
+pydbus>=0.6.0
+python-mpv>=1.0.4
+mutagen>=1.47.0
+aiofiles>=23.2.1
+aiohttp>=3.8.0
+zeroconf>=0.60.0
