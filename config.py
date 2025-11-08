@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 import os
+import secrets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,6 +17,11 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "host": "0.0.0.0",
         "port": 8080,
+        "auth": {
+            "enabled": False,
+            "api_key": None,
+            "generate_key_on_first_run": True
+        }
     },
     "discovery": {
         "enabled": True,
@@ -140,6 +146,24 @@ class Config:
         self._config = DEFAULT_CONFIG.copy()
         self._save_config()
         _LOGGER.info("Configuration reset to defaults")
+    
+    def ensure_api_key(self) -> str:
+        """Ensure API key exists, generate if needed."""
+        api_key = self.get('api.auth.api_key')
+        
+        if not api_key and self.get('api.auth.generate_key_on_first_run', True):
+            api_key = secrets.token_urlsafe(32)
+            self.set('api.auth.api_key', api_key)
+            _LOGGER.info("Generated new API key for authentication")
+        
+        return api_key
+    
+    def generate_new_api_key(self) -> str:
+        """Generate and save a new API key."""
+        api_key = secrets.token_urlsafe(32)
+        self.set('api.auth.api_key', api_key)
+        _LOGGER.info("Generated new API key")
+        return api_key
     
     @property
     def config_path(self) -> Path:

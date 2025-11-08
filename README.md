@@ -48,7 +48,12 @@ The configuration file is automatically created at `~/.config/pipeplay/config.js
   "api": {
     "enabled": true,
     "host": "0.0.0.0",
-    "port": 8080
+    "port": 8080,
+    "auth": {
+      "enabled": false,
+      "api_key": null,
+      "generate_key_on_first_run": true
+    }
   },
   "discovery": {
     "enabled": true,
@@ -60,6 +65,28 @@ The configuration file is automatically created at `~/.config/pipeplay/config.js
   }
 }
 ```
+
+### Security Configuration
+
+Enable API authentication for secure communication:
+
+```json
+{
+  "api": {
+    "auth": {
+      "enabled": true,
+      "api_key": "your-secure-api-key-here",
+      "generate_key_on_first_run": true
+    }
+  }
+}
+```
+
+When authentication is enabled:
+- All API endpoints except `/health` and `/api/auth/info` require authentication
+- Use `Authorization: Bearer <api_key>` header for requests
+- API key is automatically generated on first run if not specified
+- Check logs for the generated API key or view the config file
 
 ## Usage
 
@@ -104,24 +131,34 @@ For Home Assistant integration, install the [PipePlay Home Assistant Integration
 ## API Endpoints
 
 - `GET /api/status` - Get current player status
-- `POST /api/command` - Send control commands
+- `POST /api/command` - Send control commands  
 - `GET /api/info` - Get service information
-- `GET /health` - Health check
+- `GET /api/auth/info` - Get authentication requirements
+- `GET /health` - Health check (no auth required)
 
 ### Example Commands
 
 ```bash
-# Get status
+# Check if authentication is required
+curl http://localhost:8080/api/auth/info
+
+# Get status (no auth)
 curl http://localhost:8080/api/status
 
-# Play media
-curl -X POST http://localhost:8080/api/command \
-  -H "Content-Type: application/json" \
-  -d '{"command": "play_media", "media_type": "music", "media_id": "/path/to/file.mp3"}'
+# Get status (with auth)
+curl -H "Authorization: Bearer your-api-key-here" \
+  http://localhost:8080/api/status
 
-# Set volume
+# Play media (with auth)
 curl -X POST http://localhost:8080/api/command \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key-here" \
+  -d '{"command": "play_media", "media_type": "music", "media_id": "https://example.com/stream.mp3"}'
+
+# Set volume (with auth)
+curl -X POST http://localhost:8080/api/command \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key-here" \
   -d '{"command": "volume", "level": 0.5}'
 ```
 

@@ -2,6 +2,9 @@
 
 import asyncio
 import logging
+import secrets
+import hashlib
+import hmac
 from typing import Any, Dict, Optional
 from aiohttp import web, hdrs
 from aiohttp.web import Request, Response, json_response
@@ -13,11 +16,14 @@ _LOGGER = logging.getLogger(__name__)
 class PipePlayAPIServer:
     """HTTP API server for Home Assistant integration."""
     
-    def __init__(self, media_player, host: str = "0.0.0.0", port: int = 8080):
+    def __init__(self, media_player, host: str = "0.0.0.0", port: int = 8080, 
+                 api_key: Optional[str] = None, require_auth: bool = False):
         """Initialize API server."""
         self._media_player = media_player
         self._host = host
         self._port = port
+        self._api_key = api_key
+        self._require_auth = require_auth and api_key is not None
         self._app = None
         self._runner = None
         self._site = None
@@ -45,6 +51,10 @@ class PipePlayAPIServer:
     
     def _setup_routes(self):
         """Set up API routes."""
+        # Add authentication middleware first
+        if self._require_auth:
+            self._app.middlewares.append(self._auth_middleware)
+        
         # Add CORS middleware
         self._app.middlewares.append(self._cors_middleware)
         
@@ -53,9 +63,50 @@ class PipePlayAPIServer:
         self._app.router.add_post('/api/command', self._handle_command)
         self._app.router.add_get('/api/info', self._handle_info)
         
-        # Health check
+        # Health check (no auth required)
         self._app.router.add_get('/health', self._handle_health)
+        
+        # Auth info endpoint
+        self._app.router.add_get('/api/auth/info', self._handle_auth_info)
     
+    @web.middleware
+    async def _auth_middleware(self, request: Request, handler):
+        """Authentication middleware."""
+        # Skip auth for health check and auth info endpoints
+        if request.path in ['/health', '/api/auth/info']:
+            return await handler(request)
+        
+        # Check for API key in Authorization header
+        auth_header = request.headers.get('Authorization', '')
+        
+        if not auth_header.startswith('Bearer '):
+            return json_response({
+                "error": "Missing or invalid Authorization header",
+                "details": "Use 'Authorization: Bearer <api_key>'"
+            }, status=401)
+        
+        provided_key = auth_header[7:]  # Remove 'Bearer ' prefix
+        
+        # Constant-time comparison to prevent timing attacks
+        if not self._verify_api_key(provided_key):
+            _LOGGER.warning(f"Invalid API key attempted from {request.remote}")
+            return json_response({
+                "error": "Invalid API key"
+            }, status=401)
+        
+        return await handler(request)
+    
+    def _verify_api_key(self, provided_key: str) -> bool:
+        """Verify API key using constant-time comparison."""
+        if not self._api_key or not provided_key:
+            return False
+        
+        # Use HMAC for constant-time comparison
+        expected = hmac.new(b"pipeplay", self._api_key.encode(), hashlib.sha256).digest()
+        provided = hmac.new(b"pipeplay", provided_key.encode(), hashlib.sha256).digest()
+        
+        return hmac.compare_digest(expected, provided)
+
     @web.middleware
     async def _cors_middleware(self, request: Request, handler):
         """Add CORS headers."""
@@ -194,6 +245,14 @@ class PipePlayAPIServer:
             "service": "pipeplay"
         })
     
+    async def _handle_auth_info(self, request: Request) -> Response:
+        """Handle authentication info request."""
+        return json_response({
+            "auth_required": self._require_auth,
+            "auth_method": "bearer_token" if self._require_auth else None,
+            "service": "pipeplay"
+        })
+    
     @property
     def port(self) -> int:
         """Get the server port."""
@@ -203,3 +262,8 @@ class PipePlayAPIServer:
     def host(self) -> str:
         """Get the server host."""
         return self._host
+
+    @staticmethod
+    def generate_api_key() -> str:
+        """Generate a secure API key."""
+        return secrets.token_urlsafe(32)
