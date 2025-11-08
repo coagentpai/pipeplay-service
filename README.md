@@ -1,10 +1,10 @@
-# PipePlay - PipeWire Media Player
+# PipePlay - MPV Media Player
 
-A lightweight media player designed for seamless integration with Home Assistant, using PipeWire for audio playback.
+A lightweight media player designed for seamless integration with Home Assistant, using MPV for robust audio playback.
 
 ## Features
 
-- **PipeWire Integration**: Uses PipeWire via PulseAudio compatibility for robust audio playback
+- **MPV Backend**: Uses MPV library for robust audio playback with automatic audio system detection
 - **Home Assistant Ready**: Provides HTTP API and Zeroconf discovery for HA integration
 - **Metadata Support**: Extracts and displays media metadata (title, artist, album, etc.)
 - **Audio Controls**: Play, pause, stop, volume control, seek, and mute functionality
@@ -64,6 +64,56 @@ The configuration file is automatically created at `~/.config/pipeplay/config.js
     "volume_step": 0.1
   }
 }
+```
+
+### Audio Configuration
+
+MPV automatically detects the best available audio output. You can specify audio devices or configure audio behavior:
+
+```json
+{
+  "audio": {
+    "default_volume": 0.5,
+    "volume_step": 0.1,
+    "mpv_options": {
+      "audio-device": "pulse/alsa_output.pci-0000_00_1f.3.analog-stereo",
+      "audio-channels": "stereo",
+      "volume-max": "100"
+    }
+  }
+}
+```
+
+#### Finding Audio Devices
+
+**With PulseAudio:**
+```bash
+# List available sinks
+pactl list short sinks
+
+# Get current default sink
+pactl get-default-sink
+
+# Set default sink
+pactl set-default-sink alsa_output.pci-0000_00_1f.3.analog-stereo
+```
+
+**With PipeWire:**
+```bash
+# List audio devices
+pw-cli list-objects Node | grep -A5 -B5 "audio.channels"
+
+# Or using wpctl (WirePlumber)
+wpctl status
+```
+
+**Test audio output:**
+```bash
+# Test default device
+mpv --no-video test.mp3
+
+# Test specific device
+mpv --audio-device=pulse/alsa_output.usb-device test.mp3
 ```
 
 ### Security Configuration
@@ -168,6 +218,7 @@ curl -X POST http://localhost:8080/api/command \
 
 Run PipePlay using Docker Compose for Home Assistant integration:
 
+#### With PipeWire
 ```yaml
 version: '3.8'
 
@@ -186,6 +237,57 @@ services:
     user: "1000:1000"  # Match your host user ID
     restart: unless-stopped
     network_mode: host  # Required for Zeroconf discovery
+```
+
+#### With PulseAudio
+```yaml
+version: '3.8'
+
+services:
+  pipeplay:
+    build: .
+    container_name: pipeplay-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/.config/pipeplay
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /run/user/1000/pulse:/run/user/1000/pulse
+    environment:
+      - PULSE_RUNTIME_PATH=/run/user/1000/pulse
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+    user: "1000:1000"  # Match your host user ID
+    restart: unless-stopped
+    network_mode: host  # Required for Zeroconf discovery
+```
+
+#### PulseAudio System-wide (Alternative)
+```yaml
+version: '3.8'
+
+services:
+  pipeplay:
+    build: .
+    container_name: pipeplay-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/.config/pipeplay
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - PULSE_SERVER=host.docker.internal:4713
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "1000:1000"
+    restart: unless-stopped
+    network_mode: host
+```
+
+**Note**: For PulseAudio system-wide setup, enable network access on the host:
+```bash
+# Enable network access in PulseAudio (on host)
+echo "load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;172.16.0.0/12 port=4713" | sudo tee -a /etc/pulse/system.pa
+sudo systemctl restart pulseaudio
 ```
 
 Save this as `docker-compose.yml` and run:
@@ -230,7 +332,7 @@ pipeplay/
 ├── __init__.py
 ├── main.py              # Main entry point and service
 ├── media_player.py      # Home Assistant media player entity
-├── pipewire_backend.py  # PipeWire audio backend
+├── mpv_backend.py       # MPV audio backend
 ├── metadata_handler.py  # Media metadata extraction
 ├── api_server.py        # HTTP API server
 ├── zeroconf_discovery.py # Zeroconf service registration
@@ -240,7 +342,6 @@ pipeplay/
 
 ### Dependencies
 
-- **pulsectl**: PulseAudio/PipeWire control
 - **python-mpv**: Media playback via libmpv
 - **mutagen**: Audio metadata extraction
 - **aiohttp**: HTTP API server

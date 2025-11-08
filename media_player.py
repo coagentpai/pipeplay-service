@@ -15,20 +15,20 @@ from homeassistant.const import STATE_IDLE, STATE_PLAYING, STATE_PAUSED
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
-from .pipewire_backend import PipeWireBackend
+from .mpv_backend import MPVBackend
 from .metadata_handler import MetadataHandler
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class PipePlayPlayer(MediaPlayerEntity):
-    """Home Assistant media player using PipeWire backend."""
+    """Home Assistant media player using MPV backend."""
     
     def __init__(self, hass: HomeAssistant, name: str = "PipePlay Player"):
         """Initialize the media player."""
         self._hass = hass
         self._name = name
-        self._backend = PipeWireBackend()
+        self._backend = MPVBackend()
         self._metadata_handler = MetadataHandler()
         self._attr_unique_id = "pipeplay_player"
         self._attr_device_class = "speaker"

@@ -1,9 +1,8 @@
-"""PipeWire audio backend for media playback."""
+"""MPV audio backend for media playback."""
 
 import asyncio
 import logging
 from typing import Optional, Dict, Any, Callable
-import pulsectl
 import mpv
 from threading import Lock
 from pathlib import Path
@@ -11,11 +10,10 @@ from pathlib import Path
 _LOGGER = logging.getLogger(__name__)
 
 
-class PipeWireBackend:
-    """PipeWire-based audio backend using PulseAudio compatibility layer."""
+class MPVBackend:
+    """MPV-based audio backend for media playback."""
     
     def __init__(self):
-        self._pulse = None
         self._mpv_player = None
         self._volume = 1.0
         self._muted = False
@@ -27,10 +25,8 @@ class PipeWireBackend:
         self._state_callback: Optional[Callable] = None
         
     async def initialize(self):
-        """Initialize the PipeWire backend."""
+        """Initialize the MPV backend."""
         try:
-            self._pulse = pulsectl.Pulse('pipeplay')
-            
             # Initialize MPV player
             self._mpv_player = mpv.MPV(
                 input_default_bindings=True,
@@ -46,10 +42,10 @@ class PipeWireBackend:
             self._mpv_player.observe_property('pause', self._on_pause_change)
             self._mpv_player.observe_property('eof-reached', self._on_eof)
             
-            _LOGGER.info("PipeWire backend initialized successfully")
+            _LOGGER.info("MPV backend initialized successfully")
             
         except Exception as e:
-            _LOGGER.error(f"Failed to initialize PipeWire backend: {e}")
+            _LOGGER.error(f"Failed to initialize MPV backend: {e}")
             raise
     
     def set_state_callback(self, callback: Callable):
@@ -212,12 +208,8 @@ class PipeWireBackend:
             if self._mpv_player:
                 self._mpv_player.terminate()
                 self._mpv_player = None
-            
-            if self._pulse:
-                self._pulse.close()
-                self._pulse = None
                 
-            _LOGGER.info("PipeWire backend cleaned up")
+            _LOGGER.info("MPV backend cleaned up")
             
         except Exception as e:
             _LOGGER.error(f"Error during cleanup: {e}")
