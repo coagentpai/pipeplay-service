@@ -125,6 +125,65 @@ curl -X POST http://localhost:8080/api/command \
   -d '{"command": "volume", "level": 0.5}'
 ```
 
+## Docker
+
+### Docker Compose
+
+Run PipePlay using Docker Compose for Home Assistant integration:
+
+```yaml
+version: '3.8'
+
+services:
+  pipeplay:
+    build: .
+    container_name: pipeplay-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/.config/pipeplay
+      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+    environment:
+      - XDG_RUNTIME_DIR=/run/user/1000
+      - PIPEWIRE_RUNTIME_DIR=/run/user/1000/pipewire-0
+    user: "1000:1000"  # Match your host user ID
+    restart: unless-stopped
+    network_mode: host  # Required for Zeroconf discovery
+```
+
+Save this as `docker-compose.yml` and run:
+
+```bash
+# Build and start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+```
+
+### Docker Build
+
+Build the Docker image manually:
+
+```bash
+# Build the image
+docker build -t pipeplay:latest .
+
+# Run the container
+docker run -d \
+  --name pipeplay \
+  --network host \
+  --user 1000:1000 \
+  -e XDG_RUNTIME_DIR=/run/user/1000 \
+  -e PIPEWIRE_RUNTIME_DIR=/run/user/1000/pipewire-0 \
+  -v ./config:/app/.config/pipeplay \
+  -v /run/user/1000/pipewire-0:/run/user/1000/pipewire-0 \
+  pipeplay:latest
+```
+
 ## Development
 
 ### Project Structure
